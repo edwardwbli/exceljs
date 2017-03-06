@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title></title>
+
+    <!-- Bootstrap -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css">
+<style media="screen">
+.upload-drop-zone {
+height: 100px;
+border-width: 2px;
+margin-bottom: 20px;
+}
+
+/* skin.css Style*/
+.upload-drop-zone {
+color: #ccc;
+border-style: dashed;
+border-color: #ccc;
+line-height: 100px;
+text-align: center;
+}
+.upload-drop-zone.drop {
+color: #222;
+border-color: #222;
+}
+.panel-default>.panel-heading {
+  background-color:  #abf5aa;
+}
+.breadcrumb {
+  background-color:  #abf5aa;
+}
+</style>
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.2/html5shiv.js"></script>
+      <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+
+      <div class="container">
+        <ol class="breadcrumb">
+          <h1>Excel Analyze</h1>
+        </ol>
+      <div id="import-panel" class="panel panel-default">
+        <div class="panel-heading"><strong>Upload Files</strong> <small>Bootstrap files upload</small></div>
+        <div class="panel-body">
+
+          <!-- Standar Form -->
+          <h4>Select files from your computer</h4>
+          <input type="file" name="files[]" id="js-upload-files" multiple>
+
+
+          <!-- Drop Zone -->
+          <h4>Or drag and drop files below</h4>
+          <div class="upload-drop-zone" id="drop-zone">
+            Just drag and drop files here
+          </div>
+
+      </div>
+    </div>
+    <div id="analyse-panel" class="panel panel-default">
+      <div class="panel-heading">
+        <h3 class="panel-title">Analyze <small>analyze excel file
+        <select class="selector" name="functionseletor" id="process-excel">
+          <option value="_map" selected>Map function</option>
+          <option value="_filter">filter function</option>
+
+        </select>
+        </small>
+        </h3>
+      </div>
+      <div class="panel-body">
+
+
+      </div>
+
+    </div>
+    </div> <!-- /container -->
+
+    <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+    <script src="https://cdn.bootcss.com/jquery/3.1.1/jquery.min.js"></script>
+    <!-- Include all compiled plugins (below), or include individual files as needed -->
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+    <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.8.7/xlsx.full.min.js"></script> -->
+    <script src="xlsx.full.min.js"></script>
+    <script type="text/javascript">
+
+  'use strict';
+
+  // UPLOAD CLASS DEFINITION
+  // ======================
+
+  var dropZone = document.getElementById('drop-zone');
+  var uploadForm = document.getElementById('js-upload-files');
+  var workbook;
+  var rABS = true; // true: readAsBinaryString ; false: readAsArrayBuffer
+
+  var fixdata = function (data) {
+    var o = "", l = 0, w = 10240;
+    for(; l<data.byteLength/w; ++l) o+=String.fromCharCode.apply(null,new Uint8Array(data.slice(l*w,l*w+w)));
+    o+=String.fromCharCode.apply(null, new Uint8Array(data.slice(l*w)));
+    return o;
+  }
+  // Builds the HTML Table out of myList.
+  function buildHtmlTable(myList, selector) {
+    var columns = addAllColumnHeaders(myList, selector);
+
+    for (var i = 0; i < myList.length; i++) {
+      var row$ = $('<tr/>');
+      for (var colIndex = 0; colIndex < columns.length; colIndex++) {
+        var cellValue = myList[i][columns[colIndex]];
+        if (cellValue == null) cellValue = "";
+        row$.append($('<td/>').html(cellValue));
+      }
+      $(selector).append(row$);
+    }
+  }
+
+  // Adds a header row to the table and returns the set of columns.
+  // Need to do union of keys from all records as some records may not contain
+  // all records.
+  function addAllColumnHeaders(myList, selector) {
+    var columnSet = [];
+    var headerTr$ = $('<tr/>');
+
+    for (var i = 0; i < myList.length; i++) {
+      var rowHash = myList[i];
+      for (var key in rowHash) {
+        if ($.inArray(key, columnSet) == -1) {
+          columnSet.push(key);
+          headerTr$.append($('<th/>').html(key));
+        }
+      }
+    }
+    $(selector).append(headerTr$);
+
+    return columnSet;
+  }
+
+  var startReadFile = function(files) {
+    var excelfile = files[0];
+    var reader = new FileReader();
+    reader.onload = function(e) {
+          var excelfiledata = e.target.result;
+          if(rABS) {
+        /* if binary string, read with type 'binary' */
+            workbook = XLSX.read(excelfiledata, {type: 'binary'});
+          } else {
+        /* if array buffer, convert to base64 */
+            var arr = fixdata(excelfiledata);
+            workbook = XLSX.read(btoa(arr), {type: 'base64'});
+          }
+          var sheet_name_list = workbook.SheetNames;
+          sheet_name_list.forEach(function(y) { /* iterate through sheets */
+            var worksheet = workbook.Sheets[y];
+            var jsonsheet = XLSX.utils.sheet_to_json(worksheet);
+            buildHtmlTable(jsonsheet,'#analyse-panel>.panel-body');
+          });
+
+        };
+    reader.readAsBinaryString(excelfile);
+  }
+
+  uploadForm.addEventListener('submit', function(e) {
+      var uploadFiles = document.getElementById('js-upload-files').files;
+      e.preventDefault()
+
+      startReadFile(uploadFiles)
+  })
+
+  dropZone.ondrop = function(e) {
+      e.preventDefault();
+      this.className = 'upload-drop-zone';
+      console.log("start read file");
+      startReadFile(e.dataTransfer.files)
+  }
+
+  dropZone.ondragover = function() {
+      this.className = 'upload-drop-zone drop';
+      return false;
+  }
+
+  dropZone.ondragleave = function() {
+      this.className = 'upload-drop-zone';
+      return false;
+  }
+    </script>
+  </body>
+</html>
